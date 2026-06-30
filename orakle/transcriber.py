@@ -25,10 +25,12 @@ class Transcriber:
         model: str = "small",
         device: str = "auto",
         compute_type: str = "int8",
+        languages: Optional[list[str]] = None,
     ) -> None:
         self.model_name = model
         self.device = device
         self.compute_type = compute_type
+        self._languages = {l.lower() for l in (languages or [])}
         self._model = None
         self._active_device = "cpu"
 
@@ -95,6 +97,29 @@ class Transcriber:
             else:
                 raise
 
+    def _detect_restricted(self, audio: np.ndarray) -> Optional[str]:
+        """Détection de langue restreinte au set autorisé (FR/EN/ES).
+
+        Best-effort : si l'API `detect_language` n'est pas disponible/échoue,
+        retourne None -> Whisper fera sa détection automatique non restreinte.
+        """
+        if not self._languages:
+            return None
+        try:
+            _lang, _prob, all_probs = self._model.detect_language(audio)  # type: ignore[attr-defined]
+        except Exception:
+            return None
+        try:
+            best = None
+            for lang_code, prob in (all_probs or []):
+                if lang_code in self._languages and (best is None or prob > best[1]):
+                    best = (lang_code, prob)
+            if best is not None:
+                return best[0]
+        except Exception:
+            pass
+        return _lang if _lang in self._languages else None
+
     def _generate(
         self,
         audio: np.ndarray,
@@ -119,14 +144,16 @@ class Transcriber:
     def transcribe(
         self,
         audio: np.ndarray,
-        language: Optional[str] = "fr",
+        language: Optional[str] = None,
         initial_prompt: Optional[str] = None,
     ) -> str:
         if audio is None or len(audio) == 0:
             return ""
         self._ensure_model()
+        # langue None/"" -> détection auto (restreinte au set si possible).
+        resolved = language or self._detect_restricted(audio)
         try:
-            return self._generate(audio, language, initial_prompt)
+            return self._generate(audio, resolved, initial_prompt)
         except Exception as exc:
             # Filet de sécurité : si l'inférence GPU casse (DLL CUDA absentes),
             # on reconstruit le modèle sur CPU et on réessaie une fois.
@@ -136,5 +163,5 @@ class Transcriber:
                     exc,
                 )
                 self._build_model("cpu", "int8")
-                return self._generate(audio, language, initial_prompt)
+                return self._generate(audio, resolved, initial_prompt)
             raise

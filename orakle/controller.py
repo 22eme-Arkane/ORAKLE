@@ -73,6 +73,15 @@ class Controller(QObject):
         self.pipeline.dictionary = self.dictionary
         log.info("Dictionnaire rechargé")
 
+    def set_force_language(self, code: Optional[str]) -> None:
+        """Force une langue de transcription (None = détection auto). Persisté."""
+        self.settings["force_language"] = code
+        try:
+            config.save_settings(self.settings)
+        except Exception:
+            log.exception("Échec sauvegarde de la langue forcée")
+        log.info("Langue forcée : %s", code or "auto")
+
     # --- callbacks raccourci (thread pynput) ---
     def _rec_start(self) -> None:
         """Démarre la capture (tentative). N'affiche pas encore l'overlay."""
@@ -111,7 +120,8 @@ class Controller(QObject):
     # --- worker (thread dédié, hors boucle Qt) ---
     def _process(self, audio) -> None:  # noqa: ANN001
         try:
-            lang = self.settings.get("force_language") or "fr"
+            # None = détection automatique (restreinte au set FR/EN/ES).
+            lang = self.settings.get("force_language")
             text = self.pipeline.run(audio, language=lang)
             if text:
                 self.text_injected.emit(text)

@@ -7,10 +7,13 @@ en code (QPainter) pour éviter tout asset binaire à ce stade ; elles pourront
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QAction, QActionGroup, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from ui.dictionary_window import DictionaryWindow
+
+# Libellé -> code (None = détection automatique).
+_LANG_CHOICES = [("Auto", None), ("Français", "fr"), ("English", "en"), ("Español", "es")]
 
 _STATE_COLORS = {
     "idle": "#5b8def",        # bleu
@@ -51,6 +54,20 @@ class OrakleTray(QSystemTrayIcon):
         self._status_action.setEnabled(False)
         menu.addAction(self._status_action)
         menu.addSeparator()
+
+        # Sous-menu Langue (forçage / auto), exclusif.
+        lang_menu = menu.addMenu("Langue")
+        self._lang_group = QActionGroup(menu)
+        self._lang_group.setExclusive(True)
+        current = controller.settings.get("force_language")
+        for label, code in _LANG_CHOICES:
+            act = QAction(label, menu, checkable=True)
+            act.setChecked(code == current)
+            act.setData(code)
+            act.triggered.connect(lambda _checked, c=code: self._set_language(c))
+            self._lang_group.addAction(act)
+            lang_menu.addAction(act)
+
         dict_action = QAction("Dictionnaire…", menu)
         dict_action.triggered.connect(self._open_dictionary)
         menu.addAction(dict_action)
@@ -80,6 +97,9 @@ class OrakleTray(QSystemTrayIcon):
         self.showMessage(
             "ORAKLE — erreur", msg, QSystemTrayIcon.MessageIcon.Critical, 4000
         )
+
+    def _set_language(self, code) -> None:  # noqa: ANN001
+        self._controller.set_force_language(code)
 
     def _open_dictionary(self) -> None:
         if self._dict_window is None:

@@ -1,7 +1,6 @@
 """Orchestration : audio -> STT -> [traduction] -> correction -> injection.
 
-Pur Python, aucun couplage Qt. La traduction (Phase 5) viendra s'insérer entre
-la transcription et la correction via une interface `translator.translate(...)`.
+Pur Python, aucun couplage Qt.
 """
 from __future__ import annotations
 
@@ -11,7 +10,8 @@ from typing import Optional
 
 import numpy as np
 
-from . import injector
+from . import injector, translator
+from .command_parser import parse_command
 from .transcriber import Transcriber
 
 log = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class Pipeline:
             model=settings.get("model", "small"),
             device=settings.get("device", "auto"),
             compute_type=settings.get("compute_type", "int8"),
+            languages=settings.get("languages"),
         )
 
     def _initial_prompt(self) -> Optional[str]:
@@ -45,14 +46,32 @@ class Pipeline:
             out = pattern.sub(right, out)
         return out
 
-    def run(self, audio: np.ndarray, language: Optional[str] = "fr") -> str:
-        """Transcrit, corrige et injecte. Retourne le texte injecté (ou '')."""
+    def _maybe_translate(self, text: str) -> str:
+        """Si le texte débute par une commande de traduction, traduit le reste."""
+        tcfg = self.settings.get("translation", {})
+        cmd = parse_command(
+            text,
+            keywords=tcfg.get("command_keywords"),
+            linkers=tcfg.get("linkers"),
+        )
+        if cmd is None:
+            return text
+        src, dst, content = cmd
+        log.info("Commande de traduction détectée : %s -> %s", src, dst)
+        translated = translator.translate(content, src, dst, self.settings)
+        return translated or content
+
+    def run(self, audio: np.ndarray, language: Optional[str] = None) -> str:
+        """Transcrit, (traduit), corrige et injecte. Retourne le texte injecté."""
         text = self._transcriber.transcribe(
             audio, language=language, initial_prompt=self._initial_prompt()
         )
         text = self._apply_corrections(text)
         if not text:
             log.info("Transcription vide — rien à injecter")
+            return ""
+        text = self._maybe_translate(text)
+        if not text:
             return ""
         inj = self.settings.get("injection", {})
         injector.inject(
