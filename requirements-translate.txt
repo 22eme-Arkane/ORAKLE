@@ -1,0 +1,8 @@
+# ORAKLE — Phase 5 : traduction offline (palier 1).
+# Argos-translate (OPUS-MT / CTranslate2, Apache 2.0) — FR<->EN<->ES hors-ligne.
+#
+# ⚠ Tire une grosse dépendance transitive (torch via stanza, ~plusieurs
+#    centaines de Mo). N'installer que lorsqu'on attaque le mode traduction.
+#
+#   pip install -r requirements-translate.txt
+argostranslate>=1.9

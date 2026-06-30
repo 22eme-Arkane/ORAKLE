@@ -8,5 +8,7 @@ pynput>=1.7
 pyperclip>=1.8
 numpy>=1.24
 
-# Phase 5 — traduction offline (palier 1, par défaut)
-argostranslate>=1.9
+# Phase 5 — traduction offline : voir requirements-translate.txt
+# (argos-translate tire torch + spacy + stanza, ~plusieurs centaines de Mo).
+# Inutile pour le MVP push-to-talk. À installer le moment venu :
+#   pip install -r requirements-translate.txt
