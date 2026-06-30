@@ -27,16 +27,26 @@ class Recorder:
         self._frames: list[np.ndarray] = []
         self._lock = threading.Lock()
         self._recording = False
+        self._level = 0.0  # niveau RMS du dernier bloc (0..~1), pour l'overlay
 
     @property
     def is_recording(self) -> bool:
         return self._recording
+
+    @property
+    def level(self) -> float:
+        """Niveau audio instantané (RMS du dernier bloc capté)."""
+        return self._level
 
     def _callback(self, indata, frames, time_info, status) -> None:  # noqa: ANN001
         if status:
             log.debug("sounddevice status: %s", status)
         with self._lock:
             self._frames.append(indata.copy())
+        try:
+            self._level = float(np.sqrt(np.mean(np.square(indata, dtype=np.float32))))
+        except Exception:
+            pass
 
     def start(self) -> None:
         import sounddevice as sd  # import paresseux : pas de dépendance au chargement
@@ -45,6 +55,7 @@ class Recorder:
             return
         with self._lock:
             self._frames = []
+        self._level = 0.0
         self._stream = sd.InputStream(
             samplerate=self.sample_rate,
             channels=CHANNELS,
@@ -59,6 +70,7 @@ class Recorder:
         if not self._recording:
             return None
         self._recording = False
+        self._level = 0.0
         try:
             if self._stream is not None:
                 self._stream.stop()

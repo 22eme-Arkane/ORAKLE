@@ -11,6 +11,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from orakle.controller import Controller
+from ui.overlay import RecordingOverlay
 from ui.tray import OrakleTray
 
 
@@ -34,6 +35,20 @@ def main() -> int:
     controller = Controller()
     tray = OrakleTray(controller)
     tray.show()
+
+    # Overlay d'enregistrement (capsule + onde de forme), branché sur l'état.
+    # Le niveau micro est mis à l'échelle pour l'affichage (RMS voix ~0,02-0,1).
+    overlay = RecordingOverlay(
+        level_provider=lambda: min(1.0, controller.recorder.level * 12.0)
+    )
+
+    def _on_state(state: str) -> None:
+        if state == "recording":
+            overlay.show_overlay()
+        else:
+            overlay.hide_overlay()
+
+    controller.state_changed.connect(_on_state)
     controller.start()
     logging.getLogger(__name__).info("ORAKLE démarré — maintenir Ctrl+1 pour dicter")
 
