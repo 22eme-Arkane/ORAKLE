@@ -87,35 +87,52 @@ def main() -> int:
     arr = _qimage_to_rgba(src_img)
     h, w = arr.shape[:2]
 
-    # Boîte englobante des pixels non blancs (le médaillon).
-    nonwhite = (arr[:, :, :3] < 240).any(axis=2)
-    ys, xs = np.where(nonwhite)
-    if len(xs) == 0:
-        print("image entièrement blanche ?")
-        return 1
-    x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
-    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-    side = max(x1 - x0 + 1, y1 - y0 + 1)
-    half = side // 2
-    sx0, sy0 = max(0, cx - half), max(0, cy - half)
-    side = min(side, w - sx0, h - sy0)
+    # Si l'image est DÉJÀ détourée (fond transparent), on la garde telle quelle
+    # (juste carré + 512). Sinon (fond blanc), on recadre + masque circulaire.
+    transparent_frac = float((arr[:, :, 3] < 16).mean())
+    if transparent_frac > 0.02:
+        from PyQt6.QtGui import QPainter
 
-    crop = src_img.copy(sx0, sy0, side, side).scaled(
-        512, 512,
-        Qt.AspectRatioMode.IgnoreAspectRatio,
-        Qt.TransformationMode.SmoothTransformation,
-    )
-    rgba = _qimage_to_rgba(crop).astype(np.float32)
-    H = W = 512
+        side = max(w, h)
+        canvas = QImage(side, side, QImage.Format.Format_RGBA8888)
+        canvas.fill(Qt.GlobalColor.transparent)
+        p = QPainter(canvas)
+        p.drawImage((side - w) // 2, (side - h) // 2,
+                    src_img.convertToFormat(QImage.Format.Format_RGBA8888))
+        p.end()
+        out = canvas.scaled(
+            512, 512,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        print(f"image déjà détourée ({transparent_frac:.0%} transparent) — conservée telle quelle")
+    else:
+        nonwhite = (arr[:, :, :3] < 240).any(axis=2)
+        ys, xs = np.where(nonwhite)
+        if len(xs) == 0:
+            print("image entièrement blanche ?")
+            return 1
+        x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+        cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+        side = max(x1 - x0 + 1, y1 - y0 + 1)
+        half = side // 2
+        sx0, sy0 = max(0, cx - half), max(0, cy - half)
+        side = min(side, w - sx0, h - sy0)
 
-    # Masque circulaire (coins transparents) avec lissage 1 px.
-    yy, xx = np.ogrid[:H, :W]
-    center = W / 2.0
-    dist = np.sqrt((xx - center + 0.5) ** 2 + (yy - center + 0.5) ** 2)
-    radius = W / 2.0 - 1.0
-    edge = np.clip(radius - dist + 1.0, 0.0, 1.0)
-    rgba[:, :, 3] = rgba[:, :, 3] * edge
-    out = _rgba_to_qimage(rgba.astype(np.uint8))
+        crop = src_img.copy(sx0, sy0, side, side).scaled(
+            512, 512,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        rgba = _qimage_to_rgba(crop).astype(np.float32)
+        H = W = 512
+        yy, xx = np.ogrid[:H, :W]
+        center = W / 2.0
+        dist = np.sqrt((xx - center + 0.5) ** 2 + (yy - center + 0.5) ** 2)
+        radius = W / 2.0 - 1.0
+        edge = np.clip(radius - dist + 1.0, 0.0, 1.0)
+        rgba[:, :, 3] = rgba[:, :, 3] * edge
+        out = _rgba_to_qimage(rgba.astype(np.uint8))
 
     png_path = os.path.join(res_dir, "logo.png")
     ico_path = os.path.join(res_dir, "logo.ico")

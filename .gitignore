@@ -13,6 +13,9 @@ env/
 /config/settings.json
 /config/dictionary.json
 
+# Fichiers source du logo (PSD/exports) — seuls resources/logo.* servent à l'app
+/_Logo/
+
 # Logs / divers
 *.log
 .DS_Store
