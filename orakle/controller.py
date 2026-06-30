@@ -1,9 +1,15 @@
 """Contrôleur : relie raccourci -> enregistreur -> pipeline -> état du tray.
 
-Sert de pont entre les threads (pynput, worker de transcription) et la boucle Qt.
-Les changements d'état sont publiés via des signaux Qt pour que le tray (thread
-principal) mette à jour son icône en toute sécurité. La transcription tourne
-dans un thread worker dédié : elle ne bloque JAMAIS la boucle Qt.
+Pont entre les threads (pynput, worker de transcription) et la boucle Qt. Les
+changements d'état sont publiés via des signaux Qt pour que le tray et l'overlay
+(thread principal) se mettent à jour en sécurité. La transcription tourne dans
+un thread worker dédié : elle ne bloque JAMAIS la boucle Qt.
+
+Flux du raccourci (voir hotkey.py) :
+- on_start   : démarrer la capture (tentative) ;
+- on_confirm : capture confirmée -> état "recording" (overlay visible) ;
+- on_commit  : arrêter + transcrire + injecter ;
+- on_cancel  : arrêter + jeter (appui trop bref).
 """
 from __future__ import annotations
 
@@ -34,8 +40,12 @@ class Controller(QObject):
         self.pipeline = Pipeline(self.settings, self.dictionary)
         self.hotkey = HotkeyManager(
             hotkey=self.settings.get("hotkey", "<ctrl>+1"),
-            on_start=self._on_hotkey_start,
-            on_stop=self._on_hotkey_stop,
+            on_start=self._rec_start,
+            on_confirm=self._rec_confirm,
+            on_commit=self._rec_commit,
+            on_cancel=self._rec_cancel,
+            hold_threshold_ms=int(self.settings.get("hold_threshold_ms", 300)),
+            double_tap_window_ms=int(self.settings.get("double_tap_window_ms", 400)),
         )
         self._busy = False
 
@@ -51,26 +61,42 @@ class Controller(QObject):
         if self.recorder.is_recording:
             self.recorder.stop()
 
+    def reload_dictionary(self) -> None:
+        """Recharge le dictionnaire (après édition) sans redémarrer l'app."""
+        self.dictionary = config.load_dictionary()
+        self.pipeline.dictionary = self.dictionary
+        log.info("Dictionnaire rechargé")
+
     # --- callbacks raccourci (thread pynput) ---
-    def _on_hotkey_start(self) -> None:
+    def _rec_start(self) -> None:
+        """Démarre la capture (tentative). N'affiche pas encore l'overlay."""
         if self._busy:
-            return  # une transcription est en cours : on ignore
+            return
         try:
             self.recorder.start()
-            self.state_changed.emit("recording")
         except Exception as exc:
             log.exception("Échec démarrage enregistrement")
             self.error.emit(str(exc))
 
-    def _on_hotkey_stop(self) -> None:
+    def _rec_confirm(self) -> None:
+        """Capture confirmée -> état recording (icône + overlay)."""
+        if self.recorder.is_recording:
+            self.state_changed.emit("recording")
+
+    def _rec_cancel(self) -> None:
+        """Appui trop bref -> on jette l'audio, retour au repos."""
+        if self.recorder.is_recording:
+            self.recorder.stop()
+        self.state_changed.emit("idle")
+
+    def _rec_commit(self) -> None:
+        """Fin d'enregistrement -> transcription + injection."""
         if not self.recorder.is_recording:
             return
         audio = self.recorder.stop()
         self.state_changed.emit("processing")
         self._busy = True
-        threading.Thread(
-            target=self._process, args=(audio,), daemon=True
-        ).start()
+        threading.Thread(target=self._process, args=(audio,), daemon=True).start()
 
     # --- worker (thread dédié, hors boucle Qt) ---
     def _process(self, audio) -> None:  # noqa: ANN001

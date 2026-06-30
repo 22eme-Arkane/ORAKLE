@@ -8,6 +8,7 @@
   "device": "cpu",
   "compute_type": "int8",
   "append_trailing_space": true,
+  "show_notifications": false,
   "translation": {
     "engine": "argos",
     "_engine_options": ["argos", "ollama", "anthropic"],

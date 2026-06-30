@@ -15,8 +15,9 @@ from PyQt6.QtCore import QRectF, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPainterPath
 from PyQt6.QtWidgets import QApplication, QWidget
 
-_N_BARS = 15
-_W, _H = 190, 60
+_N_BARS = 13
+_W, _H = 96, 28                       # ~1/4 de l'ancienne taille (190x60)
+_MARGIN_BOTTOM = 6                    # collé juste au-dessus de la barre des tâches
 _BG = QColor(18, 20, 32, 235)        # sombre cohérent avec le thème (bg1)
 _BAR = QColor(150, 180, 255)          # bleu clair (même teinte que l'icône idle)
 
@@ -48,9 +49,11 @@ class RecordingOverlay(QWidget):
         screen = QApplication.primaryScreen()
         if screen is None:
             return
+        # availableGeometry exclut déjà la barre des tâches : son bord bas est
+        # le haut de la taskbar -> on se colle juste au-dessus.
         geo = screen.availableGeometry()
         x = geo.x() + (geo.width() - self.width()) // 2
-        y = geo.y() + geo.height() - self.height() - 80
+        y = geo.y() + geo.height() - self.height() - _MARGIN_BOTTOM
         self.move(x, y)
 
     # --- API publique (appelée sur le thread principal Qt) ---
@@ -89,7 +92,7 @@ class RecordingOverlay(QWidget):
         p.fillPath(path, _BG)
 
         n = _N_BARS
-        pad = 24.0
+        pad = 12.0
         slot = (w - 2 * pad) / n
         bar_w = min(4.0, slot * 0.55)
         max_h = h * 0.55

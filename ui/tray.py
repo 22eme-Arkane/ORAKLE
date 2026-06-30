@@ -10,6 +10,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from ui.dictionary_window import DictionaryWindow
+
 _STATE_COLORS = {
     "idle": "#5b8def",        # bleu
     "recording": "#e8553c",   # rouge
@@ -39,14 +41,19 @@ class OrakleTray(QSystemTrayIcon):
     def __init__(self, controller, parent=None) -> None:  # noqa: ANN001
         super().__init__(parent)
         self._controller = controller
+        self._dict_window = None
         self._icons = {state: _make_icon(c) for state, c in _STATE_COLORS.items()}
         self.setIcon(self._icons["idle"])
-        self.setToolTip("ORAKLE — maintenir Ctrl+1 pour dicter")
+        self.setToolTip("ORAKLE — maintenir Ctrl+1 (ou double-tap) pour dicter")
 
         menu = QMenu()
         self._status_action = QAction("État : prêt", menu)
         self._status_action.setEnabled(False)
         menu.addAction(self._status_action)
+        menu.addSeparator()
+        dict_action = QAction("Dictionnaire…", menu)
+        dict_action.triggered.connect(self._open_dictionary)
+        menu.addAction(dict_action)
         menu.addSeparator()
         quit_action = QAction("Quitter", menu)
         quit_action.triggered.connect(self._quit)
@@ -62,6 +69,10 @@ class OrakleTray(QSystemTrayIcon):
         self._status_action.setText(f"État : {_STATE_LABELS.get(state, state)}")
 
     def _on_injected(self, text: str) -> None:
+        # Notification de dictée : désactivée par défaut (réglable). On évite de
+        # spammer une bulle Windows à chaque phrase dictée.
+        if not self._controller.settings.get("show_notifications", False):
+            return
         short = (text[:40] + "…") if len(text) > 40 else text
         self.showMessage("ORAKLE", short, self._icons["idle"], 2000)
 
@@ -69,6 +80,16 @@ class OrakleTray(QSystemTrayIcon):
         self.showMessage(
             "ORAKLE — erreur", msg, QSystemTrayIcon.MessageIcon.Critical, 4000
         )
+
+    def _open_dictionary(self) -> None:
+        if self._dict_window is None:
+            self._dict_window = DictionaryWindow()
+            self._dict_window.saved.connect(self._controller.reload_dictionary)
+        else:
+            self._dict_window._load()  # rafraîchir depuis le disque
+        self._dict_window.show()
+        self._dict_window.raise_()
+        self._dict_window.activateWindow()
 
     def _quit(self) -> None:
         self._controller.shutdown()
