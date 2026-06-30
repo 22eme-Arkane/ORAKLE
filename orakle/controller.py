@@ -19,6 +19,7 @@ import threading
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from orakle import config
+from orakle.audio_ducker import AudioDucker
 from orakle.hotkey import HotkeyManager
 from orakle.pipeline import Pipeline
 from orakle.recorder import Recorder
@@ -38,6 +39,10 @@ class Controller(QObject):
         self.dictionary = config.load_dictionary()
         self.recorder = Recorder()
         self.pipeline = Pipeline(self.settings, self.dictionary)
+        self.ducker = AudioDucker(
+            enabled=bool(self.settings.get("mute_media_while_recording", True)),
+            targets=self.settings.get("mute_targets", []),
+        )
         self.hotkey = HotkeyManager(
             hotkey=self.settings.get("hotkey", "<ctrl>+1"),
             on_start=self._rec_start,
@@ -60,6 +65,7 @@ class Controller(QObject):
             log.exception("Erreur à l'arrêt du raccourci")
         if self.recorder.is_recording:
             self.recorder.stop()
+        self.ducker.unmute()
 
     def reload_dictionary(self) -> None:
         """Recharge le dictionnaire (après édition) sans redémarrer l'app."""
@@ -79,14 +85,17 @@ class Controller(QObject):
             self.error.emit(str(exc))
 
     def _rec_confirm(self) -> None:
-        """Capture confirmée -> état recording (icône + overlay)."""
+        """Capture confirmée -> état recording (icône + overlay) + mute audio."""
         if self.recorder.is_recording:
             self.state_changed.emit("recording")
+            # Couper le son des autres apps pendant la prise (anti-interférence).
+            self.ducker.mute()
 
     def _rec_cancel(self) -> None:
         """Appui trop bref -> on jette l'audio, retour au repos."""
         if self.recorder.is_recording:
             self.recorder.stop()
+        self.ducker.unmute()
         self.state_changed.emit("idle")
 
     def _rec_commit(self) -> None:
@@ -94,6 +103,7 @@ class Controller(QObject):
         if not self.recorder.is_recording:
             return
         audio = self.recorder.stop()
+        self.ducker.unmute()  # restaurer le son dès la fin de capture
         self.state_changed.emit("processing")
         self._busy = True
         threading.Thread(target=self._process, args=(audio,), daemon=True).start()
@@ -109,5 +119,6 @@ class Controller(QObject):
             log.exception("Échec du pipeline")
             self.error.emit(str(exc))
         finally:
+            self.ducker.unmute()  # sécurité : ne jamais laisser une app muette
             self._busy = False
             self.state_changed.emit("idle")
