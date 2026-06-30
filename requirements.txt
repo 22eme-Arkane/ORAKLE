@@ -1,0 +1,12 @@
+# ORAKLE — dictée vocale locale (Python 3.12)
+
+# Cœur Phase 0–1 (MVP push-to-talk FR)
+PyQt6>=6.6
+faster-whisper>=1.0
+sounddevice>=0.4
+pynput>=1.7
+pyperclip>=1.8
+numpy>=1.24
+
+# Phase 5 — traduction offline (palier 1, par défaut)
+argostranslate>=1.9

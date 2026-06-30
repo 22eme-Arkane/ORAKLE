@@ -1,0 +1,26 @@
+{
+  "hotkey": "<ctrl>+1",
+  "hold_threshold_ms": 300,
+  "double_tap_window_ms": 400,
+  "languages": ["fr", "en", "es"],
+  "force_language": null,
+  "model": "small",
+  "device": "auto",
+  "compute_type": "int8",
+  "append_trailing_space": true,
+  "translation": {
+    "engine": "argos",
+    "_engine_options": ["argos", "ollama", "anthropic"],
+    "ollama": {
+      "host": "http://localhost:11434",
+      "model": "mistral"
+    },
+    "command_keywords": ["translate", "traduis", "traduire", "traducir"],
+    "linkers": ["vers", "to", "a", "en"],
+    "byok_enabled": false
+  },
+  "injection": {
+    "method": "clipboard_paste",
+    "restore_clipboard": true
+  }
+}
