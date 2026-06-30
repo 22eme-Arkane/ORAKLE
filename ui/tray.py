@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QActionGroup, QColor, QIcon, QPainter, QPixmap
 from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from ui.app_icon import load_logo_pixmap, state_icon
 from ui.dictionary_window import DictionaryWindow
 
 # Libellé -> code (None = détection automatique).
@@ -45,7 +46,14 @@ class OrakleTray(QSystemTrayIcon):
         super().__init__(parent)
         self._controller = controller
         self._dict_window = None
-        self._icons = {state: _make_icon(c) for state, c in _STATE_COLORS.items()}
+        # Logo si présent (resources/logo.png|ico), sinon ronds de couleur.
+        logo = load_logo_pixmap(256)
+        if logo is not None:
+            self._icons = {
+                s: state_icon(logo, s) for s in ("idle", "recording", "processing")
+            }
+        else:
+            self._icons = {s: _make_icon(c) for s, c in _STATE_COLORS.items()}
         self.setIcon(self._icons["idle"])
         self.setToolTip("ORAKLE — maintenir Ctrl+1 (ou double-tap) pour dicter")
 

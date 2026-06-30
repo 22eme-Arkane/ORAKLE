@@ -11,6 +11,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from orakle.controller import Controller
+from ui.app_icon import load_logo_icon
 from ui.overlay import RecordingOverlay
 from ui.tray import OrakleTray
 
@@ -27,6 +28,9 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("ORAKLE")
     app.setQuitOnLastWindowClosed(False)  # l'app vit en tray
+    _logo = load_logo_icon()
+    if _logo is not None:
+        app.setWindowIcon(_logo)  # icône fenêtres + barre des tâches
 
     if not QSystemTrayIcon.isSystemTrayAvailable():
         QMessageBox.critical(None, "ORAKLE", "Aucun system tray disponible.")
