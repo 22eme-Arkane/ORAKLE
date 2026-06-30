@@ -1,5 +1,5 @@
 {
-  "bias_terms": ["projection mapping", "MadMapper", "Resolume", "PyQt6"],
+  "bias_terms": ["ORAKLE", "projection mapping", "MadMapper", "Resolume", "PyQt6"],
   "corrections": {
     "made mapper": "MadMapper",
     "pi qt": "PyQt6"
