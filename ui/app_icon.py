@@ -18,7 +18,19 @@ from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 _RES_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resources"
 )
-_CANDIDATES = (os.path.join(_RES_DIR, "logo.ico"), os.path.join(_RES_DIR, "logo.png"))
+_PNG = os.path.join(_RES_DIR, "logo.png")
+_ICO = os.path.join(_RES_DIR, "logo.ico")
+# Icône d'app : .ico d'abord (multi-tailles natif Windows). Pixmap tray : .png
+# d'abord (512² net) sinon .ico.
+_ICON_ORDER = (_ICO, _PNG)
+_PIXMAP_ORDER = (_PNG, _ICO)
+
+
+def _first_existing(paths) -> Optional[str]:
+    for p in paths:
+        if os.path.isfile(p):
+            return p
+    return None
 
 _STATE_DOT = {
     "recording": "#e8553c",   # rouge
@@ -27,14 +39,12 @@ _STATE_DOT = {
 
 
 def logo_file() -> Optional[str]:
-    for p in _CANDIDATES:
-        if os.path.isfile(p):
-            return p
-    return None
+    """Un fichier logo existant (n'importe quel format), ou None."""
+    return _first_existing(_ICON_ORDER)
 
 
 def load_logo_icon() -> Optional[QIcon]:
-    path = logo_file()
+    path = _first_existing(_ICON_ORDER)
     if not path:
         return None
     icon = QIcon(path)
@@ -42,7 +52,7 @@ def load_logo_icon() -> Optional[QIcon]:
 
 
 def load_logo_pixmap(size: int = 256) -> Optional[QPixmap]:
-    path = logo_file()
+    path = _first_existing(_PIXMAP_ORDER)
     if not path:
         return None
     pm = QPixmap(path)
