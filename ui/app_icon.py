@@ -32,9 +32,11 @@ def _first_existing(paths) -> Optional[str]:
             return p
     return None
 
+# Couleurs d'état pensées pour le daltonisme : bleu vs jaune (complémentaires),
+# fort écart de teinte ET de luminosité -> distinguables pour deutan/protan/tritan.
 _STATE_DOT = {
-    "recording": "#e8553c",   # rouge
-    "processing": "#e8a13c",   # orange
+    "recording": "#ffc83d",   # jaune (enregistrement)
+    "processing": "#2d7dff",   # bleu (transcription)
 }
 
 

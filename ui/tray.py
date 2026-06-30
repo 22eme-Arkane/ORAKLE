@@ -16,10 +16,11 @@ from ui.dictionary_window import DictionaryWindow
 # Libellé -> code (None = détection automatique).
 _LANG_CHOICES = [("Auto", None), ("Français", "fr"), ("English", "en"), ("Español", "es")]
 
+# Repli (logo absent) : cohérent avec les pastilles d'état (bleu/jaune daltonien).
 _STATE_COLORS = {
-    "idle": "#5b8def",        # bleu
-    "recording": "#e8553c",   # rouge
-    "processing": "#e8a13c",  # orange
+    "idle": "#8a90b0",        # gris neutre
+    "recording": "#ffc83d",   # jaune
+    "processing": "#2d7dff",  # bleu
 }
 
 _STATE_LABELS = {
