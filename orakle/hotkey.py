@@ -145,12 +145,21 @@ class HotkeyManager:
 
     def _on_hold_elapsed(self) -> None:
         """Appelé ~hold_threshold après l'appui : si toujours maintenu, confirmer."""
+        confirm = False
         with self._lock:
             if self._mode == "hold" and self._recording and self._engaged:
-                self._fire(self._on_confirm)
+                confirm = True
+        if confirm:
+            log.info("raccourci: maintien confirmé -> overlay/mute")
+            self._fire(self._on_confirm)
 
-    # --- machine à états (sous verrou) ---
+    # --- machine à états ---
+    # IMPORTANT : on ne calcule que les transitions SOUS le verrou, puis on tire
+    # les callbacks HORS du verrou. Les callbacks peuvent être lents (ouverture
+    # micro, mute audio via COM) : les exécuter sous verrou bloquerait le
+    # relâchement (qui a besoin du même verrou) -> Ctrl+1 « ne répond plus ».
     def _combo_down(self) -> None:
+        to_fire: list[tuple[str, Optional[Callable[[], None]]]] = []
         with self._lock:
             if self._mode == "toggle":
                 # Appui de fermeture du mode mains-libres.
@@ -158,16 +167,18 @@ class HotkeyManager:
                 self._recording = False
                 self._closing = True
                 self._cancel_confirm_timer()
-                self._fire(self._on_commit)
-                return
-            # Début d'un appui : capture tentative (sera confirmée ou annulée).
-            self._t_down = self._now()
-            self._recording = True
-            self._mode = "hold"
-            self._fire(self._on_start)
-            self._arm_confirm_timer()
+                to_fire.append(("commit (fermeture mains-libres)", self._on_commit))
+            else:
+                # Début d'un appui : capture tentative (confirmée ou annulée).
+                self._t_down = self._now()
+                self._recording = True
+                self._mode = "hold"
+                self._arm_confirm_timer()
+                to_fire.append(("start (appui)", self._on_start))
+        self._fire_all(to_fire)
 
     def _combo_up(self) -> None:
+        to_fire: list[tuple[str, Optional[Callable[[], None]]]] = []
         with self._lock:
             if self._closing:
                 self._closing = False
@@ -181,23 +192,28 @@ class HotkeyManager:
                 self._recording = False
                 self._mode = None
                 self._last_tap = None
-                self._fire(self._on_commit)
-                return
-            # Appui bref -> annuler la capture tentative.
-            now = self._now()
-            self._recording = False
-            self._mode = None
-            self._fire(self._on_cancel)
-            if self._last_tap is not None and (now - self._last_tap) <= self._dtap_s:
-                # DOUBLE-TAP -> mode mains-libres.
-                self._last_tap = None
-                self._mode = "toggle"
-                self._recording = True
-                self._fire(self._on_start)
-                self._fire(self._on_confirm)
+                to_fire.append(("commit (maintien %.0f ms)" % (duration * 1000), self._on_commit))
             else:
-                # 1er tap : mémoriser pour un éventuel 2e.
-                self._last_tap = now
+                # Appui bref -> annuler la capture tentative.
+                now = self._now()
+                self._recording = False
+                self._mode = None
+                to_fire.append(("cancel (appui %.0f ms)" % (duration * 1000), self._on_cancel))
+                if self._last_tap is not None and (now - self._last_tap) <= self._dtap_s:
+                    # DOUBLE-TAP -> mode mains-libres.
+                    self._last_tap = None
+                    self._mode = "toggle"
+                    self._recording = True
+                    to_fire.append(("start (mains-libres)", self._on_start))
+                    to_fire.append(("confirm (mains-libres)", self._on_confirm))
+                else:
+                    self._last_tap = now  # 1er tap : attendre un éventuel 2e
+        self._fire_all(to_fire)
+
+    def _fire_all(self, items) -> None:  # noqa: ANN001
+        for label, cb in items:
+            log.info("raccourci: %s", label)
+            self._fire(cb)
 
     # --- callbacks pynput ---
     def _on_press(self, key) -> None:  # noqa: ANN001

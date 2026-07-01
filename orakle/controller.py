@@ -86,9 +86,11 @@ class Controller(QObject):
     def _rec_start(self) -> None:
         """Démarre la capture (tentative). N'affiche pas encore l'overlay."""
         if self._busy:
+            log.info("start ignoré : transcription précédente en cours")
             return
         try:
             self.recorder.start()
+            log.info("micro: enregistrement démarré")
         except Exception as exc:
             log.exception("Échec démarrage enregistrement")
             self.error.emit(str(exc))
@@ -110,8 +112,11 @@ class Controller(QObject):
     def _rec_commit(self) -> None:
         """Fin d'enregistrement -> transcription + injection."""
         if not self.recorder.is_recording:
+            log.info("commit ignoré : aucun enregistrement en cours")
             return
         audio = self.recorder.stop()
+        n = 0 if audio is None else len(audio)
+        log.info("micro: %d échantillons capturés -> transcription", n)
         self.ducker.unmute()  # restaurer le son dès la fin de capture
         self.state_changed.emit("processing")
         self._busy = True
