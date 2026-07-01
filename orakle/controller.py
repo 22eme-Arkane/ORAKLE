@@ -102,12 +102,16 @@ class Controller(QObject):
     def _rec_confirm(self) -> None:
         """Capture confirmée -> état recording (icône + overlay) + mute audio."""
         if self.recorder.is_recording:
+            log.info("état: RECORDING (overlay + mute)")
             self.state_changed.emit("recording")
             # Couper le son des autres apps pendant la prise (anti-interférence).
             self.ducker.mute()
+        else:
+            log.info("confirm ignoré: micro non armé")
 
     def _rec_cancel(self) -> None:
         """Appui trop bref -> on jette l'audio, retour au repos."""
+        log.info("état: annulé (appui trop bref)")
         if self.recorder.is_recording:
             self.recorder.stop()
         self.ducker.unmute()
