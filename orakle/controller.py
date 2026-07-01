@@ -56,6 +56,9 @@ class Controller(QObject):
 
     def start(self) -> None:
         self.hotkey.start()
+        # Pré-ouvrir le micro en tâche de fond (~centaines de ms) pour que la
+        # 1re dictée capture instantanément, sans bloquer le démarrage de l'UI.
+        threading.Thread(target=self.recorder.warm, daemon=True).start()
         self.state_changed.emit("idle")
 
     def shutdown(self) -> None:
@@ -66,6 +69,7 @@ class Controller(QObject):
         if self.recorder.is_recording:
             self.recorder.stop()
         self.ducker.unmute()
+        self.recorder.close()
 
     def reload_dictionary(self) -> None:
         """Recharge le dictionnaire (après édition) sans redémarrer l'app."""
