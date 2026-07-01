@@ -44,22 +44,23 @@ class RecordingOverlay(QWidget):
         self._timer.setInterval(40)  # ~25 fps
         self._timer.timeout.connect(self._tick)
 
-    # --- placement bas-centre de l'écran principal ---
-    def _reposition(self) -> None:
-        screen = QApplication.primaryScreen()
+    # --- placement bas-centre d'un écran (principal par défaut) ---
+    def _reposition(self, screen=None) -> None:
+        screen = screen or QApplication.primaryScreen()
         if screen is None:
             return
         # availableGeometry exclut déjà la barre des tâches : son bord bas est
-        # le haut de la taskbar -> on se colle juste au-dessus.
+        # le haut de la taskbar -> on se colle juste au-dessus. Les coordonnées sont
+        # dans l'espace bureau global, donc valides pour n'importe quel écran.
         geo = screen.availableGeometry()
         x = geo.x() + (geo.width() - self.width()) // 2
         y = geo.y() + geo.height() - self.height() - _MARGIN_BOTTOM
         self.move(x, y)
 
     # --- API publique (appelée sur le thread principal Qt) ---
-    def show_overlay(self) -> None:
+    def show_overlay(self, screen=None) -> None:
         self._bars = [0.12] * _N_BARS
-        self._reposition()
+        self._reposition(screen)
         self.show()
         self.raise_()
         self._timer.start()
@@ -104,3 +105,35 @@ class RecordingOverlay(QWidget):
             x = pad + slot * i + (slot - bar_w) / 2.0
             p.drawRoundedRect(QRectF(x, cy - bh / 2.0, bar_w, bh), bar_w / 2.0, bar_w / 2.0)
         p.end()
+
+
+class RecordingOverlays:
+    """Gère UN overlay d'enregistrement par écran (multi-moniteur).
+
+    L'indicateur apparaît en bas-centre de CHAQUE écran connecté, pour qu'on sache
+    toujours que la dictée enregistre, quel que soit l'écran qu'on regarde. La liste
+    est reconstruite à chaque affichage si le nombre d'écrans a changé (moniteur
+    branché/débranché en cours de session). Même API que RecordingOverlay
+    (show_overlay / hide_overlay) : interchangeable dans main.py.
+    """
+
+    def __init__(self, level_provider: Optional[Callable[[], float]] = None) -> None:
+        self._level_provider = level_provider
+        self._overlays: list[RecordingOverlay] = []
+
+    def _sync_to_screens(self):
+        screens = QApplication.screens()
+        if len(self._overlays) != len(screens):
+            for ov in self._overlays:
+                ov.hide_overlay()
+                ov.deleteLater()
+            self._overlays = [RecordingOverlay(self._level_provider) for _ in screens]
+        return screens
+
+    def show_overlay(self) -> None:
+        for ov, screen in zip(self._overlays, self._sync_to_screens()):
+            ov.show_overlay(screen)
+
+    def hide_overlay(self) -> None:
+        for ov in self._overlays:
+            ov.hide_overlay()

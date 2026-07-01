@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from orakle.controller import Controller
 from ui.app_icon import load_logo_icon
-from ui.overlay import RecordingOverlay
+from ui.overlay import RecordingOverlays
 from ui.tray import OrakleTray
 
 
@@ -40,9 +40,9 @@ def main() -> int:
     tray = OrakleTray(controller)
     tray.show()
 
-    # Overlay d'enregistrement (capsule + onde de forme), branché sur l'état.
-    # Le niveau micro est mis à l'échelle pour l'affichage (RMS voix ~0,02-0,1).
-    overlay = RecordingOverlay(
+    # Overlay d'enregistrement (capsule + onde de forme) sur TOUS les écrans, branché
+    # sur l'état. Le niveau micro est mis à l'échelle pour l'affichage (RMS voix ~0,02-0,1).
+    overlay = RecordingOverlays(
         level_provider=lambda: min(1.0, controller.recorder.level * 12.0)
     )
 
