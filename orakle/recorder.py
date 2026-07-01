@@ -27,8 +27,11 @@ CHANNELS = 1
 
 
 class Recorder:
-    def __init__(self, sample_rate: int = SAMPLE_RATE) -> None:
+    def __init__(self, sample_rate: int = SAMPLE_RATE, device=None) -> None:  # noqa: ANN001
         self.sample_rate = sample_rate
+        # Périphérique d'entrée : None = défaut système ; sinon nom (sous-chaîne)
+        # ou index sounddevice (ex. « Focusrite »).
+        self.device = device or None
         self._stream = None
         self._stream_lock = threading.Lock()
         self._frames: list[np.ndarray] = []
@@ -57,21 +60,62 @@ class Recorder:
         except Exception:
             pass
 
+    def _open(self, sd, device):  # noqa: ANN001
+        stream = sd.InputStream(
+            samplerate=self.sample_rate,
+            channels=CHANNELS,
+            dtype="float32",
+            device=device,
+            callback=self._callback,
+        )
+        stream.start()
+        return stream
+
     def _ensure_stream(self) -> None:
         with self._stream_lock:
             if self._stream is not None:
                 return
             import sounddevice as sd  # import paresseux
 
-            stream = sd.InputStream(
-                samplerate=self.sample_rate,
-                channels=CHANNELS,
-                dtype="float32",
-                callback=self._callback,
-            )
-            stream.start()
-            self._stream = stream
-            log.info("micro: flux ouvert (chaud)")
+            try:
+                self._stream = self._open(sd, self.device)
+            except Exception as exc:
+                if self.device is not None:
+                    log.warning(
+                        "Micro « %s » indisponible (%s) — bascule sur le défaut",
+                        self.device, exc,
+                    )
+                    self._stream = self._open(sd, None)
+                else:
+                    raise
+            # Journaliser le périphérique réellement utilisé.
+            try:
+                idx = self._stream.device
+                name = sd.query_devices(idx)["name"]
+                log.info("micro: flux ouvert (chaud) — périphérique: %s", name)
+            except Exception:
+                log.info("micro: flux ouvert (chaud)")
+
+    def set_device(self, device) -> None:  # noqa: ANN001
+        """Change de micro : ferme le flux courant et rouvre sur le nouveau."""
+        self.device = device or None
+        self.close()
+        self.warm()
+
+    @staticmethod
+    def list_input_devices() -> list[dict]:
+        """Liste des périphériques d'entrée disponibles (name, index)."""
+        import sounddevice as sd
+
+        out, seen = [], set()
+        for i, d in enumerate(sd.query_devices()):
+            if d.get("max_input_channels", 0) > 0:
+                name = d.get("name", f"device {i}")
+                if name in seen:
+                    continue
+                seen.add(name)
+                out.append({"index": i, "name": name})
+        return out
 
     def warm(self) -> None:
         """Pré-ouvre le flux (coûteux ~centaines de ms) pour que start() soit

@@ -77,6 +77,10 @@ class OrakleTray(QSystemTrayIcon):
             self._lang_group.addAction(act)
             lang_menu.addAction(act)
 
+        # Sous-menu Microphone (rempli à l'ouverture pour refléter le matériel).
+        self._mic_menu = menu.addMenu("Microphone")
+        self._mic_menu.aboutToShow.connect(self._populate_mics)
+
         dict_action = QAction("Dictionnaire…", menu)
         dict_action.triggered.connect(self._open_dictionary)
         menu.addAction(dict_action)
@@ -109,6 +113,35 @@ class OrakleTray(QSystemTrayIcon):
 
     def _set_language(self, code) -> None:  # noqa: ANN001
         self._controller.set_force_language(code)
+
+    def _populate_mics(self) -> None:
+        """Reconstruit le sous-menu Microphone d'après le matériel présent."""
+        self._mic_menu.clear()
+        self._mic_group = QActionGroup(self._mic_menu)
+        self._mic_group.setExclusive(True)
+        current = self._controller.settings.get("input_device")
+
+        auto = QAction("Auto (défaut système)", self._mic_menu, checkable=True)
+        auto.setChecked(not current)
+        auto.triggered.connect(lambda _c: self._controller.set_input_device(None))
+        self._mic_group.addAction(auto)
+        self._mic_menu.addAction(auto)
+        self._mic_menu.addSeparator()
+
+        try:
+            from orakle.recorder import Recorder
+
+            for dev in Recorder.list_input_devices():
+                name = dev["name"]
+                act = QAction(name, self._mic_menu, checkable=True)
+                act.setChecked(current == name)
+                act.triggered.connect(lambda _c, n=name: self._controller.set_input_device(n))
+                self._mic_group.addAction(act)
+                self._mic_menu.addAction(act)
+        except Exception as exc:  # noqa: BLE001
+            err = QAction(f"(énumération impossible : {exc})", self._mic_menu)
+            err.setEnabled(False)
+            self._mic_menu.addAction(err)
 
     def _open_dictionary(self) -> None:
         if self._dict_window is None:

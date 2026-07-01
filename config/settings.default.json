@@ -5,6 +5,7 @@
   "languages": ["fr", "en", "es"],
   "force_language": null,
   "model": "small",
+  "input_device": null,
   "device": "cpu",
   "compute_type": "int8",
   "append_trailing_space": true,

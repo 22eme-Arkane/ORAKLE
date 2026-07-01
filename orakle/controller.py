@@ -37,7 +37,7 @@ class Controller(QObject):
         super().__init__()
         self.settings = config.load_settings()
         self.dictionary = config.load_dictionary()
-        self.recorder = Recorder()
+        self.recorder = Recorder(device=self.settings.get("input_device"))
         self.pipeline = Pipeline(self.settings, self.dictionary)
         self.ducker = AudioDucker(
             enabled=bool(self.settings.get("mute_media_while_recording", True)),
@@ -76,6 +76,19 @@ class Controller(QObject):
         self.dictionary = config.load_dictionary()
         self.pipeline.dictionary = self.dictionary
         log.info("Dictionnaire rechargé")
+
+    def set_input_device(self, device) -> None:  # noqa: ANN001
+        """Change le micro d'entrée (None = défaut système). Persisté + rouvert."""
+        self.settings["input_device"] = device
+        try:
+            config.save_settings(self.settings)
+        except Exception:
+            log.exception("Échec sauvegarde du micro")
+        try:
+            self.recorder.set_device(device)
+        except Exception:
+            log.exception("Échec ouverture du micro sélectionné")
+        log.info("micro sélectionné : %s", device or "défaut système")
 
     def set_force_language(self, code: Optional[str]) -> None:
         """Force une langue de transcription (None = détection auto). Persisté."""
