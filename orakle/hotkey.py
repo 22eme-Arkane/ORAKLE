@@ -92,13 +92,22 @@ class HotkeyManager:
     @staticmethod
     def _key_char(key) -> Optional[str]:  # noqa: ANN001
         try:
-            if getattr(key, "char", None):
-                return key.char.lower()
+            ch = getattr(key, "char", None)
+            # Avec Ctrl enfoncé, Windows livre un caractère de CONTRÔLE
+            # ('\x01'..'\x1a') au lieu de la lettre -> on retombe sur le vk.
+            if ch and ch >= " ":
+                return ch.lower()
         except Exception:
             pass
         vk = getattr(key, "vk", None)
-        if vk is not None and 0x30 <= vk <= 0x39:
+        if vk is None:
+            return None
+        if 0x30 <= vk <= 0x39:      # rangée des chiffres
             return chr(vk)
+        if 0x60 <= vk <= 0x69:      # pavé numérique -> même chiffre
+            return chr(vk - 0x30)
+        if 0x41 <= vk <= 0x5A:      # lettres -> minuscule
+            return chr(vk + 0x20)
         return None
 
     @staticmethod

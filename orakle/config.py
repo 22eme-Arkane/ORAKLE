@@ -61,14 +61,36 @@ def _save_json(path: Path, data: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
+def _merge_missing(user: dict[str, Any], defaults: dict[str, Any]) -> bool:
+    """Ajoute à `user` les clés du template absentes (récursif). True si modifié."""
+    changed = False
+    for key, value in defaults.items():
+        if key not in user:
+            user[key] = value
+            changed = True
+        elif isinstance(value, dict) and isinstance(user.get(key), dict):
+            changed = _merge_missing(user[key], value) or changed
+    return changed
+
+
 def load_settings() -> dict[str, Any]:
-    """Réglages utilisateur ; retombe sur le template si lecture impossible."""
+    """Réglages utilisateur ; complète avec les clés du template (migration)."""
     _ensure_user_files()
     path = user_config_dir() / SETTINGS_FILENAME
     try:
-        return _load_json(path)
+        data = _load_json(path)
     except (OSError, json.JSONDecodeError):
         return _load_json(_DEFAULTS_DIR / "settings.default.json")
+    # Migration douce : les réglages ajoutés par les nouvelles versions
+    # apparaissent dans le fichier utilisateur (valeurs par défaut), sans
+    # jamais écraser une valeur existante.
+    try:
+        defaults = _load_json(_DEFAULTS_DIR / "settings.default.json")
+        if _merge_missing(data, defaults):
+            _save_json(path, data)
+    except (OSError, json.JSONDecodeError):
+        pass
+    return data
 
 
 def save_settings(data: dict[str, Any]) -> None:

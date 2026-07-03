@@ -39,6 +39,16 @@ class AudioDucker:
 
     @staticmethod
     def _sessions():
+        # COM doit être initialisé DANS LE THREAD APPELANT : mute() part d'un
+        # threading.Timer (confirmation) et unmute() du thread pynput ou du
+        # worker. Sans CoInitialize ici, pycaw échoue en silence sur ces threads
+        # (le ducking « ne fait rien »). S_FALSE (déjà initialisé) est inoffensif.
+        try:
+            import comtypes
+
+            comtypes.CoInitialize()
+        except Exception:
+            pass
         from pycaw.pycaw import AudioUtilities  # import paresseux (Windows + pycaw)
 
         return AudioUtilities.GetAllSessions()

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 

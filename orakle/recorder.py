@@ -104,18 +104,39 @@ class Recorder:
 
     @staticmethod
     def list_input_devices() -> list[dict]:
-        """Liste des périphériques d'entrée disponibles (name, index)."""
+        """Périphériques d'entrée (name, index), via WASAPI de préférence.
+
+        MME (host API par défaut) tronque les noms à 31 caractères et duplique
+        chaque périphérique dans toutes les host APIs -> on filtre sur WASAPI
+        (noms complets, une entrée par vrai périphérique). Repli : toutes APIs.
+        """
         import sounddevice as sd
 
-        out, seen = [], set()
-        for i, d in enumerate(sd.query_devices()):
-            if d.get("max_input_channels", 0) > 0:
+        try:
+            apis = sd.query_hostapis()
+            wasapi = next(
+                (i for i, a in enumerate(apis) if "wasapi" in a["name"].lower()),
+                None,
+            )
+        except Exception:
+            wasapi = None
+
+        def _collect(api_filter) -> list[dict]:
+            out, seen = [], set()
+            for i, d in enumerate(sd.query_devices()):
+                if d.get("max_input_channels", 0) <= 0:
+                    continue
+                if api_filter is not None and d.get("hostapi") != api_filter:
+                    continue
                 name = d.get("name", f"device {i}")
                 if name in seen:
                     continue
                 seen.add(name)
                 out.append({"index": i, "name": name})
-        return out
+            return out
+
+        devices = _collect(wasapi) if wasapi is not None else []
+        return devices or _collect(None)
 
     def warm(self) -> None:
         """Pré-ouvre le flux (coûteux ~centaines de ms) pour que start() soit

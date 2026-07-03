@@ -33,7 +33,10 @@ def _paste_via_clipboard(text: str, restore: bool = True) -> bool:
     time.sleep(0.05)
 
     if restore and previous is not None:
-        time.sleep(0.1)  # laisser le coller aboutir avant de restaurer
+        # Certaines applis lisent le presse-papier en différé après le Ctrl+V ;
+        # restaurer trop tôt collerait l'ANCIEN contenu. On tourne dans le
+        # thread worker, donc ce délai ne bloque rien côté UI.
+        time.sleep(0.3)
         try:
             pyperclip.copy(previous)
         except Exception:
