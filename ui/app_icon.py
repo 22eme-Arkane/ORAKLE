@@ -15,9 +15,9 @@ from typing import Optional
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QIcon, QPainter, QPixmap
 
-_RES_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "resources"
-)
+from orakle.paths import app_root
+
+_RES_DIR = str(app_root() / "resources")
 _PNG = os.path.join(_RES_DIR, "logo.png")
 _ICO = os.path.join(_RES_DIR, "logo.ico")
 # Icône d'app : .ico d'abord (multi-tailles natif Windows). Pixmap tray : .png

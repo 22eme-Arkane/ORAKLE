@@ -78,6 +78,44 @@ class Controller(QObject):
         self.pipeline.dictionary = self.dictionary
         log.info("Dictionnaire rechargé")
 
+    def reload_settings(self) -> None:
+        """Recharge settings.json et réapplique à chaud ce qui peut l'être.
+
+        - raccourci + seuils : listener recréé ;
+        - pipeline : recréé (modèle/langues pris en compte à la prochaine dictée,
+          le nouveau modèle Whisper se charge paresseusement) ;
+        - ducking : activé/cibles mis à jour ;
+        - micro : rouvert si le périphérique a changé.
+        """
+        old_device = self.settings.get("input_device")
+        self.settings = config.load_settings()
+        self.pipeline = Pipeline(self.settings, self.dictionary)
+        self.ducker.enabled = bool(self.settings.get("mute_media_while_recording", True))
+        self.ducker.targets = {
+            t.lower() for t in (self.settings.get("mute_targets") or [])
+        }
+        try:
+            self.hotkey.stop()
+        except Exception:
+            log.exception("Erreur à l'arrêt de l'ancien raccourci")
+        self.hotkey = HotkeyManager(
+            hotkey=self.settings.get("hotkey", "<ctrl>+1"),
+            on_start=self._rec_start,
+            on_confirm=self._rec_confirm,
+            on_commit=self._rec_commit,
+            on_cancel=self._rec_cancel,
+            hold_threshold_ms=int(self.settings.get("hold_threshold_ms", 300)),
+            double_tap_window_ms=int(self.settings.get("double_tap_window_ms", 400)),
+        )
+        self.hotkey.start()
+        new_device = self.settings.get("input_device")
+        if new_device != old_device:
+            try:
+                self.recorder.set_device(new_device)
+            except Exception:
+                log.exception("Échec ouverture du micro sélectionné")
+        log.info("Réglages rechargés et appliqués")
+
     def set_input_device(self, device) -> None:  # noqa: ANN001
         """Change le micro d'entrée (None = défaut système). Persisté + rouvert."""
         self.settings["input_device"] = device

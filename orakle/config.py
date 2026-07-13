@@ -12,12 +12,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from orakle.paths import app_root
+
 APP_NAME = "orakle"
 
-# Ce fichier vit dans orakle/config.py ; le dépôt est le parent du paquet.
-_PKG_DIR = Path(__file__).resolve().parent
-_REPO_DIR = _PKG_DIR.parent
-_DEFAULTS_DIR = _REPO_DIR / "config"
+_DEFAULTS_DIR = app_root() / "config"
 
 SETTINGS_FILENAME = "settings.json"
 DICTIONARY_FILENAME = "dictionary.json"
@@ -95,6 +94,29 @@ def load_settings() -> dict[str, Any]:
 
 def save_settings(data: dict[str, Any]) -> None:
     _save_json(user_config_dir() / SETTINGS_FILENAME, data)
+
+
+def export_all(path: str | Path) -> None:
+    """Exporte réglages + dictionnaire dans un seul JSON portable."""
+    bundle = {
+        "orakle_export": 1,
+        "settings": load_settings(),
+        "dictionary": load_dictionary(),
+    }
+    _save_json(Path(path), bundle)
+
+
+def import_all(path: str | Path) -> None:
+    """Importe un export ORAKLE (réglages + dictionnaire). Lève si invalide."""
+    data = _load_json(Path(path))
+    if not isinstance(data, dict) or "orakle_export" not in data:
+        raise ValueError("Ce fichier n'est pas un export ORAKLE.")
+    settings = data.get("settings")
+    dictionary = data.get("dictionary")
+    if isinstance(settings, dict) and settings:
+        save_settings(settings)
+    if isinstance(dictionary, dict) and dictionary:
+        save_dictionary(dictionary)
 
 
 def load_dictionary() -> dict[str, Any]:

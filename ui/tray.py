@@ -47,6 +47,7 @@ class OrakleTray(QSystemTrayIcon):
         super().__init__(parent)
         self._controller = controller
         self._dict_window = None
+        self._settings_window = None
         # Logo si présent (resources/logo.png|ico), sinon ronds de couleur.
         logo = load_logo_pixmap(256)
         if logo is not None:
@@ -84,6 +85,9 @@ class OrakleTray(QSystemTrayIcon):
         dict_action = QAction("Dictionnaire…", menu)
         dict_action.triggered.connect(self._open_dictionary)
         menu.addAction(dict_action)
+        settings_action = QAction("Réglages…", menu)
+        settings_action.triggered.connect(self._open_settings)
+        menu.addAction(settings_action)
         menu.addSeparator()
         quit_action = QAction("Quitter", menu)
         quit_action.triggered.connect(self._quit)
@@ -152,6 +156,22 @@ class OrakleTray(QSystemTrayIcon):
         self._dict_window.show()
         self._dict_window.raise_()
         self._dict_window.activateWindow()
+
+    def _on_settings_saved(self) -> None:
+        self._controller.reload_settings()
+        self._controller.reload_dictionary()  # un import peut aussi changer le dico
+
+    def _open_settings(self) -> None:
+        from ui.settings_window import SettingsWindow
+
+        if self._settings_window is None:
+            self._settings_window = SettingsWindow()
+            self._settings_window.saved.connect(self._on_settings_saved)
+        else:
+            self._settings_window._load()  # rafraîchir depuis le disque
+        self._settings_window.show()
+        self._settings_window.raise_()
+        self._settings_window.activateWindow()
 
     def _quit(self) -> None:
         self._controller.shutdown()
