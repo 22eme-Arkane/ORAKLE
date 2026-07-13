@@ -102,23 +102,43 @@ class Transcriber:
 
         Best-effort : si l'API `detect_language` n'est pas disponible/échoue,
         retourne None -> Whisper fera sa détection automatique non restreinte.
+        Toujours JOURNALISER le résultat : indispensable pour diagnostiquer les
+        « il écrit en français quand je parle espagnol ».
         """
         if not self._languages:
             return None
         try:
-            _lang, _prob, all_probs = self._model.detect_language(audio)  # type: ignore[attr-defined]
+            # vad_filter : ne pas détecter la langue sur le silence de début.
+            raw_lang, raw_prob, all_probs = self._model.detect_language(  # type: ignore[attr-defined]
+                audio, vad_filter=True
+            )
+        except TypeError:
+            try:  # versions plus anciennes sans vad_filter
+                raw_lang, raw_prob, all_probs = self._model.detect_language(audio)  # type: ignore[attr-defined]
+            except Exception:
+                log.info("détection de langue indisponible -> auto Whisper")
+                return None
         except Exception:
+            log.info("détection de langue indisponible -> auto Whisper")
             return None
+        best = None
         try:
-            best = None
             for lang_code, prob in (all_probs or []):
                 if lang_code in self._languages and (best is None or prob > best[1]):
                     best = (lang_code, prob)
-            if best is not None:
-                return best[0]
         except Exception:
             pass
-        return _lang if _lang in self._languages else None
+        if best is not None:
+            log.info(
+                "langue détectée : %s (%.2f) [brut : %s %.2f]",
+                best[0], best[1], raw_lang, raw_prob,
+            )
+            return best[0]
+        if raw_lang in self._languages:
+            log.info("langue détectée : %s (%.2f)", raw_lang, raw_prob)
+            return raw_lang
+        log.info("langue détectée hors set (%s %.2f) -> auto", raw_lang, raw_prob)
+        return None
 
     def _generate(
         self,
@@ -152,6 +172,11 @@ class Transcriber:
         self._ensure_model()
         # langue None/"" -> détection auto (restreinte au set si possible).
         resolved = language or self._detect_restricted(audio)
+        if resolved is None:
+            # Détection interne Whisper : NE PAS passer l'initial_prompt (le
+            # biais du dictionnaire est en français et aimanterait la sortie
+            # vers le français quelle que soit la langue parlée).
+            initial_prompt = None
         try:
             return self._generate(audio, resolved, initial_prompt)
         except Exception as exc:
