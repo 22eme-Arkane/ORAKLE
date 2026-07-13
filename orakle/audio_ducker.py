@@ -36,6 +36,7 @@ class AudioDucker:
         self._own_pid = os.getpid()
         self._saved: dict[int, bool] = {}   # pid -> état mute précédent
         self._muted = False
+        self._warned_unavailable = False    # avertir UNE fois si pycaw indispo
 
     @staticmethod
     def _sessions():
@@ -93,8 +94,14 @@ class AudioDucker:
                     len(saved),
                 )
         except Exception as exc:
-            # pycaw absent / COM indisponible : on n'altère rien.
-            log.debug("Audio ducking indisponible (%s)", exc)
+            # pycaw absent / COM indisponible : on n'altère rien, mais on le DIT
+            # (une fois) — un échec silencieux ici a déjà masqué un pycaw manquant.
+            if not self._warned_unavailable:
+                self._warned_unavailable = True
+                log.warning(
+                    "Sourdine des autres apps indisponible (%s) — "
+                    "vérifier que pycaw est installé (pip install pycaw)", exc,
+                )
             self._muted = False
             self._saved = {}
 
