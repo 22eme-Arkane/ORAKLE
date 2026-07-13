@@ -54,7 +54,10 @@ def main() -> int:
 
     controller.state_changed.connect(_on_state)
     controller.start()
-    logging.getLogger(__name__).info("ORAKLE démarré — maintenir Ctrl+1 pour dicter")
+    logging.getLogger(__name__).info(
+        "ORAKLE démarré — maintenir %s pour dicter",
+        controller.settings.get("hotkey", "<ctrl>+1"),
+    )
 
     return app.exec()
 

@@ -57,7 +57,9 @@ class OrakleTray(QSystemTrayIcon):
         else:
             self._icons = {s: _make_icon(c) for s, c in _STATE_COLORS.items()}
         self.setIcon(self._icons["idle"])
-        self.setToolTip("ORAKLE — maintenir Ctrl+1 (ou double-tap) pour dicter")
+        hotkey = controller.settings.get("hotkey", "<ctrl>+1")
+        pretty = "+".join(p.strip("<>").capitalize() for p in hotkey.split("+") if p)
+        self.setToolTip(f"ORAKLE — maintenir {pretty} (ou double-tap) pour dicter")
 
         menu = QMenu()
         self._status_action = QAction("État : prêt", menu)
