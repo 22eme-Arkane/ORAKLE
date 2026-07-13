@@ -52,6 +52,7 @@ class Controller(QObject):
             on_cancel=self._rec_cancel,
             hold_threshold_ms=int(self.settings.get("hold_threshold_ms", 300)),
             double_tap_window_ms=int(self.settings.get("double_tap_window_ms", 400)),
+            exclusive=bool(self.settings.get("exclusive_hotkey", True)),
         )
         self._busy = False
 
@@ -106,6 +107,7 @@ class Controller(QObject):
             on_cancel=self._rec_cancel,
             hold_threshold_ms=int(self.settings.get("hold_threshold_ms", 300)),
             double_tap_window_ms=int(self.settings.get("double_tap_window_ms", 400)),
+            exclusive=bool(self.settings.get("exclusive_hotkey", True)),
         )
         self.hotkey.start()
         new_device = self.settings.get("input_device")

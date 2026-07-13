@@ -90,6 +90,8 @@ class SettingsWindow(QWidget):
         hint = QLabel("Format : <ctrl>+<touche> — ex. <ctrl>+1, <ctrl>+<alt>+d")
         hint.setObjectName("hint")
         f1.addRow("", hint)
+        self._exclusive = QCheckBox("Réserver le raccourci à ORAKLE (invisible pour les autres applications)")
+        f1.addRow("", self._exclusive)
         self._hold = QSpinBox()
         self._hold.setRange(100, 1500)
         self._hold.setSuffix(" ms")
@@ -196,6 +198,7 @@ class SettingsWindow(QWidget):
     def _load(self) -> None:
         s = config.load_settings()
         self._hotkey.setText(s.get("hotkey", "<ctrl>+1"))
+        self._exclusive.setChecked(bool(s.get("exclusive_hotkey", True)))
         self._hold.setValue(int(s.get("hold_threshold_ms", 300)))
         self._dtap.setValue(int(s.get("double_tap_window_ms", 400)))
         self._space.setChecked(bool(s.get("append_trailing_space", True)))
@@ -228,6 +231,7 @@ class SettingsWindow(QWidget):
             return
         s = config.load_settings()  # repartir du fichier pour ne rien perdre
         s["hotkey"] = hotkey
+        s["exclusive_hotkey"] = self._exclusive.isChecked()
         s["hold_threshold_ms"] = self._hold.value()
         s["double_tap_window_ms"] = self._dtap.value()
         s["append_trailing_space"] = self._space.isChecked()

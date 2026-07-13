@@ -1,5 +1,6 @@
 {
   "hotkey": "<ctrl>+1",
+  "exclusive_hotkey": true,
   "hold_threshold_ms": 300,
   "double_tap_window_ms": 400,
   "languages": ["fr", "en", "es"],

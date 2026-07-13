@@ -41,6 +41,7 @@ class HotkeyManager:
         hold_threshold_ms: int = 300,
         double_tap_window_ms: int = 400,
         clock: Optional[Callable[[], float]] = None,
+        exclusive: bool = True,
     ) -> None:
         self._on_start = on_start
         self._on_confirm = on_confirm
@@ -50,6 +51,10 @@ class HotkeyManager:
         self._hold_s = max(0.0, hold_threshold_ms / 1000.0)
         self._dtap_s = max(0.0, double_tap_window_ms / 1000.0)
         self._now = clock or time.monotonic
+        # Mode exclusif (Windows) : le raccourci est CONSOMMÉ par ORAKLE — les
+        # autres applications ne le voient pas (priorité façon Wispr).
+        self._exclusive = exclusive
+        self._main_vks = self._vks_for(self._main)
 
         self._listener = None
         self._ctrl_down = False
@@ -78,6 +83,41 @@ class HotkeyManager:
             elif token:
                 main = token
         return mods, main
+
+    @staticmethod
+    def _vks_for(main: Optional[str]) -> set[int]:
+        """Codes virtuels Windows correspondant à la touche principale."""
+        if not main or len(main) != 1:
+            return set()
+        o = ord(main)
+        if 0x30 <= o <= 0x39:          # chiffre : rangée du haut + pavé numérique
+            return {o, o + 0x30}
+        if "a" <= main <= "z":         # lettre
+            return {o - 0x20}
+        return set()
+
+    def _win32_filter(self, msg, data) -> bool:  # noqa: ANN001
+        """Filtre bas niveau (Windows) : consomme la touche du raccourci.
+
+        Appelé par pynput pour CHAQUE événement clavier, avant les callbacks.
+        On supprime l'événement système (listener._suppress = True) uniquement
+        pour la touche principale quand le combo est actif — les autres apps
+        (dont Claude) ne voient jamais le raccourci. Tout le reste passe, et il
+        faut REMETTRE _suppress à False pour chaque autre touche (l'attribut est
+        relu par le hook à chaque événement).
+        """
+        try:
+            listener = self._listener
+            if listener is None:
+                return True
+            listener._suppress = (
+                self._exclusive
+                and data.vkCode in self._main_vks
+                and (self._engaged or self._mods_satisfied())
+            )
+        except Exception:
+            pass
+        return True
 
     # --- helpers touches ---
     def _mods_satisfied(self) -> bool:
@@ -272,12 +312,16 @@ class HotkeyManager:
         if self._listener is not None:
             return
         self._listener = keyboard.Listener(
-            on_press=self._on_press, on_release=self._on_release
+            on_press=self._on_press,
+            on_release=self._on_release,
+            # Ignoré hors Windows (préfixe win32_ filtré par plateforme).
+            win32_event_filter=self._win32_filter,
         )
         self._listener.start()
         log.info(
-            "Écoute du raccourci %s+%s active (maintien + double-tap)",
+            "Écoute du raccourci %s+%s active (maintien + double-tap%s)",
             "+".join(sorted(self._mods)), self._main,
+            ", exclusif" if self._exclusive else "",
         )
 
     def stop(self) -> None:
