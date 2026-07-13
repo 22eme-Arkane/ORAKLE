@@ -16,6 +16,10 @@ env/
 # Fichiers source du logo (PSD/exports) — seuls resources/logo.* servent à l'app
 /_Logo/
 
+# Build PyInstaller
+/build/
+/dist/
+
 # Logs / divers
 *.log
 .DS_Store

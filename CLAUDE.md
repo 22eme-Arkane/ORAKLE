@@ -273,23 +273,31 @@ Deux mécanismes complémentaires :
 - `hotkey.py` mode maintien uniquement, `recorder.py`, `transcriber.py` (FR),
   `injector.py`. Maintenir Ctrl+1 → parler → texte injecté. **MVP utilisable.**
 
-**Phase 2 — Mode toggle + retour visuel**
-- Machine à états complète (double-tap), icônes d'état, overlay optionnel.
+**Phase 2 — Mode toggle + retour visuel** ✅
+- Machine à états complète (double-tap), icônes d'état, overlay onde de forme.
 
-**Phase 3 — Multilingue FR/EN/ES**
-- Détection auto restreinte au set, forçage langue depuis le menu.
+**Phase 3 — Multilingue FR/EN/ES** ✅
+- Détection auto restreinte au set, forçage langue depuis le menu du tray.
 
-**Phase 4 — Dictionnaire personnalisé**
-- Biaisage `initial_prompt` + post-correction + éditeur dans la fenêtre réglages.
+**Phase 4 — Dictionnaire personnalisé** ✅
+- Biaisage `initial_prompt` + post-correction + éditeur (tray → Dictionnaire…).
 
-**Phase 5 — Mode traduction**
-- `command_parser.py` + argos-translate FR↔EN↔ES (palier 1), gestion paquets de
-  langue. Palier 2 Ollama branché derrière l'interface `translator.py`.
+**Phase 5 — Mode traduction** ✅
+- `command_parser.py` + argos-translate FR↔EN↔ES (palier 1, auto-install des
+  paquets). Palier 2 Ollama + palier 3 BYOK derrière `translator.py`.
 
-**Phase 6 — Finitions**
-- Réglages complets (modèle, raccourci, langues, espace final, moteur de
-  traduction), export/import config, packaging (PyInstaller), README, palier 3
-  BYOK optionnel.
+**Phase 6 — Finitions** ✅
+- Fenêtre Réglages complète (raccourci validé, seuils, modèle, device, micro,
+  ducking, moteur de traduction, BYOK), export/import config, packaging
+  PyInstaller (`orakle.spec` + `build.ps1`, onedir, SANS argos/torch — voir spec).
+
+**Hors roadmap, livré en plus**
+- Sourdine des autres apps pendant la dictée (`audio_ducker.py`, WASAPI/pycaw).
+- Choix du microphone (tray → Microphone, WASAPI actifs uniquement).
+- Flux micro « chaud » persistant (latence nulle au démarrage de dictée ;
+  aucun audio conservé hors dictée).
+- Pastilles d'état daltonisme-compatibles (jaune=enregistrement, bleu=transcription).
+- Logo médaillon (`resources/logo.png|ico`, source dans `_Logo/`, gitignorée).
 
 ---
 
