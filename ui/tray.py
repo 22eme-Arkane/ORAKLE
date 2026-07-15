@@ -96,9 +96,12 @@ class OrakleTray(QSystemTrayIcon):
         menu.addAction(quit_action)
         self.setContextMenu(menu)
 
+        self._menu = menu
+        self._update_action = None
         controller.state_changed.connect(self._on_state)
         controller.text_injected.connect(self._on_injected)
         controller.error.connect(self._on_error)
+        controller.update_available.connect(self._on_update_available)
 
     def _on_state(self, state: str) -> None:
         self.setIcon(self._icons.get(state, self._icons["idle"]))
@@ -158,6 +161,26 @@ class OrakleTray(QSystemTrayIcon):
         self._dict_window.show()
         self._dict_window.raise_()
         self._dict_window.activateWindow()
+
+    def _on_update_available(self, version: str, url: str) -> None:
+        """Nouvelle version sur GitHub : entrée de menu + notification (1 fois)."""
+        if self._update_action is not None:
+            return
+        import webbrowser
+
+        act = QAction(f"⬆ Mettre à jour vers {version}…", self._menu)
+        act.triggered.connect(lambda _c: webbrowser.open(url))
+        first = self._menu.actions()[0] if self._menu.actions() else None
+        self._menu.insertAction(first, act)
+        self._update_action = act
+        # Notification légitime même si les notifs de dictée sont coupées :
+        # unique par session, et c'est une information de sécurité/maj.
+        self.showMessage(
+            "ORAKLE — mise à jour disponible",
+            f"La version {version} est disponible. Clic droit sur l'icône → "
+            f"« Mettre à jour » pour la télécharger.",
+            QSystemTrayIcon.MessageIcon.Information, 6000,
+        )
 
     def _on_settings_saved(self) -> None:
         self._controller.reload_settings()

@@ -4,7 +4,7 @@
 ; Sortie   : installer\ORAKLE_Setup_{version}.exe
 
 #define AppName "ORAKLE"
-#define AppVersion "0.1.0"
+#define AppVersion "0.1.1"
 #define AppPublisher "22eme ARKANE"
 #define AppExeName "ORAKLE.exe"
 

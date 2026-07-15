@@ -33,6 +33,7 @@ class Controller(QObject):
     state_changed = pyqtSignal(str)
     text_injected = pyqtSignal(str)
     error = pyqtSignal(str)
+    update_available = pyqtSignal(str, str)  # (version, url page release)
 
     def __init__(self) -> None:
         super().__init__()
@@ -61,7 +62,24 @@ class Controller(QObject):
         # Pré-ouvrir le micro en tâche de fond (~centaines de ms) pour que la
         # 1re dictée capture instantanément, sans bloquer le démarrage de l'UI.
         threading.Thread(target=self.recorder.warm, daemon=True).start()
+        # Vérification de mise à jour (GitHub Releases), désactivable.
+        if self.settings.get("check_updates", True):
+            threading.Thread(target=self._check_updates, daemon=True).start()
         self.state_changed.emit("idle")
+
+    def _check_updates(self) -> None:
+        from orakle import version
+
+        result = version.fetch_latest()
+        if result is None:
+            return
+        latest, url = result
+        if version.is_newer(latest):
+            log.info("Mise à jour disponible : %s (installé : %s)",
+                     latest, version.VERSION)
+            self.update_available.emit(latest, url)
+        else:
+            log.info("ORAKLE %s est à jour", version.VERSION)
 
     def shutdown(self) -> None:
         try:

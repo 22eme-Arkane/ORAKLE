@@ -104,6 +104,8 @@ class SettingsWindow(QWidget):
         f1.addRow("", self._space)
         self._notif = QCheckBox("Notification Windows à chaque dictée")
         f1.addRow("", self._notif)
+        self._updates = QCheckBox("Vérifier les mises à jour au démarrage (GitHub)")
+        f1.addRow("", self._updates)
         root.addWidget(g1)
 
         # --- Dictée ---
@@ -203,6 +205,7 @@ class SettingsWindow(QWidget):
         self._dtap.setValue(int(s.get("double_tap_window_ms", 400)))
         self._space.setChecked(bool(s.get("append_trailing_space", True)))
         self._notif.setChecked(bool(s.get("show_notifications", False)))
+        self._updates.setChecked(bool(s.get("check_updates", True)))
         model = s.get("model", "small")
         self._model.setCurrentText(model if model in _MODELS else "small")
         di = self._device.findData(s.get("device", "cpu"))
@@ -236,6 +239,7 @@ class SettingsWindow(QWidget):
         s["double_tap_window_ms"] = self._dtap.value()
         s["append_trailing_space"] = self._space.isChecked()
         s["show_notifications"] = self._notif.isChecked()
+        s["check_updates"] = self._updates.isChecked()
         s["model"] = self._model.currentText()
         s["device"] = self._device.currentData()
         s["input_device"] = self._mic.currentData()

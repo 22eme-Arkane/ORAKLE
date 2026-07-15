@@ -1,3 +1,3 @@
 """Paquet cœur d'ORAKLE (logique métier, sans dépendance UI)."""
 
-__version__ = "0.1.0"
+from orakle.version import VERSION as __version__  # noqa: F401
