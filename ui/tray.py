@@ -16,11 +16,11 @@ from ui.dictionary_window import DictionaryWindow
 # Libellé -> code (None = détection automatique).
 _LANG_CHOICES = [("Auto", None), ("Français", "fr"), ("English", "en"), ("Español", "es")]
 
-# Repli (logo absent) : cohérent avec les pastilles d'état (bleu/jaune daltonien).
+# Repli (logo absent) : cohérent avec les pastilles d'état (jaune/rouge).
 _STATE_COLORS = {
     "idle": "#8a90b0",        # gris neutre
     "recording": "#ffc83d",   # jaune
-    "processing": "#2d7dff",  # bleu
+    "processing": "#ff453a",  # rouge
 }
 
 _STATE_LABELS = {
@@ -84,6 +84,13 @@ class OrakleTray(QSystemTrayIcon):
         self._mic_menu = menu.addMenu("Microphone")
         self._mic_menu.aboutToShow.connect(self._populate_mics)
 
+        # Filet de sécurité : si le collage est parti dans le vide (focus
+        # perdu), la dernière dictée reste récupérable ici.
+        self._copy_last_action = QAction("Copier la dernière dictée", menu)
+        self._copy_last_action.setEnabled(bool(getattr(controller, "last_text", "")))
+        self._copy_last_action.triggered.connect(self._copy_last)
+        menu.addAction(self._copy_last_action)
+
         dict_action = QAction("Dictionnaire…", menu)
         dict_action.triggered.connect(self._open_dictionary)
         menu.addAction(dict_action)
@@ -108,12 +115,27 @@ class OrakleTray(QSystemTrayIcon):
         self._status_action.setText(f"État : {_STATE_LABELS.get(state, state)}")
 
     def _on_injected(self, text: str) -> None:
+        self._copy_last_action.setEnabled(True)
         # Notification de dictée : désactivée par défaut (réglable). On évite de
         # spammer une bulle Windows à chaque phrase dictée.
         if not self._controller.settings.get("show_notifications", False):
             return
         short = (text[:40] + "…") if len(text) > 40 else text
         self.showMessage("ORAKLE", short, self._icons["idle"], 2000)
+
+    def _copy_last(self) -> None:
+        text = getattr(self._controller, "last_text", "")
+        if not text:
+            return
+        try:
+            import pyperclip
+
+            pyperclip.copy(text)
+        except Exception:
+            self.showMessage(
+                "ORAKLE — erreur", "Copie impossible.",
+                QSystemTrayIcon.MessageIcon.Critical, 3000,
+            )
 
     def _on_error(self, msg: str) -> None:
         self.showMessage(

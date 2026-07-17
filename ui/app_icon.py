@@ -4,7 +4,7 @@ Le logo est lu depuis `resources/logo.ico` ou `resources/logo.png` (le 1er
 trouvé). S'il est absent, les appelants retombent sur un rendu par défaut.
 
 Pour le tray, on superpose une petite pastille de couleur sur le logo afin de
-garder l'indication d'état (rouge = enregistrement, orange = transcription ;
+garder l'indication d'état (jaune = enregistrement, rouge = transcription ;
 rien au repos), sans perdre l'identité visuelle.
 """
 from __future__ import annotations
@@ -32,11 +32,12 @@ def _first_existing(paths) -> Optional[str]:
             return p
     return None
 
-# Couleurs d'état pensées pour le daltonisme : bleu vs jaune (complémentaires),
-# fort écart de teinte ET de luminosité -> distinguables pour deutan/protan/tritan.
+# Couleurs d'état (demande Matthieu, daltonien chromatique) : jaune = capture
+# en cours, rouge = traitement. Le rouge apparaît plus SOMBRE que le jaune pour
+# un deutan/protan -> l'écart de luminosité maintient la distinction.
 _STATE_DOT = {
     "recording": "#ffc83d",   # jaune (enregistrement)
-    "processing": "#2d7dff",   # bleu (transcription)
+    "processing": "#ff453a",   # rouge (transcription en cours)
 }
 
 

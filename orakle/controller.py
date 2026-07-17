@@ -32,6 +32,8 @@ class Controller(QObject):
     # "idle" | "recording" | "processing"
     state_changed = pyqtSignal(str)
     text_injected = pyqtSignal(str)
+    nothing_heard = pyqtSignal()   # transcription vide (silence / bruit)
+    busy_hint = pyqtSignal()       # appui reçu MAIS transcription en cours
     error = pyqtSignal(str)
     update_available = pyqtSignal(str, str)  # (version, url page release)
 
@@ -56,12 +58,16 @@ class Controller(QObject):
             exclusive=bool(self.settings.get("exclusive_hotkey", True)),
         )
         self._busy = False
+        self.last_text = ""  # dernière dictée injectée (bouton « Copier »)
 
     def start(self) -> None:
         self.hotkey.start()
         # Pré-ouvrir le micro en tâche de fond (~centaines de ms) pour que la
         # 1re dictée capture instantanément, sans bloquer le démarrage de l'UI.
         threading.Thread(target=self.recorder.warm, daemon=True).start()
+        # Précharger Whisper aussi : sinon la 1re dictée paie le chargement du
+        # modèle (8 s à 1 min) et les appuis pendant ce temps sont perdus.
+        threading.Thread(target=self.pipeline.warm, daemon=True).start()
         # Vérification de mise à jour (GitHub Releases), désactivable.
         if self.settings.get("check_updates", True):
             threading.Thread(target=self._check_updates, daemon=True).start()
@@ -134,6 +140,8 @@ class Controller(QObject):
                 self.recorder.set_device(new_device)
             except Exception:
                 log.exception("Échec ouverture du micro sélectionné")
+        # Le pipeline recréé repart sans modèle chargé -> re-précharger.
+        threading.Thread(target=self.pipeline.warm, daemon=True).start()
         log.info("Réglages rechargés et appliqués")
 
     def set_input_device(self, device) -> None:  # noqa: ANN001
@@ -163,6 +171,7 @@ class Controller(QObject):
         """Démarre la capture (tentative). N'affiche pas encore l'overlay."""
         if self._busy:
             log.info("start ignoré : transcription précédente en cours")
+            self.busy_hint.emit()  # feedback visuel au lieu d'un silence total
             return
         try:
             self.recorder.start()
@@ -209,7 +218,10 @@ class Controller(QObject):
             lang = self.settings.get("force_language")
             text = self.pipeline.run(audio, language=lang)
             if text:
+                self.last_text = text
                 self.text_injected.emit(text)
+            else:
+                self.nothing_heard.emit()
         except Exception as exc:
             log.exception("Échec du pipeline")
             self.error.emit(str(exc))

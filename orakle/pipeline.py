@@ -28,6 +28,10 @@ class Pipeline:
             languages=settings.get("languages"),
         )
 
+    def warm(self) -> None:
+        """Précharge le modèle Whisper (voir Transcriber.warm)."""
+        self._transcriber.warm()
+
     def _initial_prompt(self) -> Optional[str]:
         """Biaisage Whisper : injecte le vocabulaire perso dans initial_prompt."""
         terms = self.dictionary.get("bias_terms") or []

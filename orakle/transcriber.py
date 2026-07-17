@@ -76,9 +76,19 @@ class Transcriber:
             "Chargement Whisper '%s' (device=%s, compute=%s)…",
             self.model_name, device, compute_type,
         )
-        self._model = WhisperModel(
-            self.model_name, device=device, compute_type=compute_type
-        )
+        try:
+            # Cache local d'abord : sans réseau. Au démarrage de Windows le
+            # Wi-Fi n'est pas toujours prêt — la vérification HuggingFace
+            # bloquait la 1re dictée pendant des dizaines de secondes.
+            self._model = WhisperModel(
+                self.model_name, device=device, compute_type=compute_type,
+                local_files_only=True,
+            )
+        except Exception:
+            # Modèle pas (encore) en cache : téléchargement normal.
+            self._model = WhisperModel(
+                self.model_name, device=device, compute_type=compute_type
+            )
         self._active_device = device
 
     def _ensure_model(self) -> None:
@@ -96,6 +106,18 @@ class Transcriber:
                 self._build_model("cpu", "int8")
             else:
                 raise
+
+    def warm(self) -> None:
+        """Précharge le modèle (au démarrage, en tâche de fond).
+
+        Sans ça, le modèle se charge à la PREMIÈRE dictée : 8 s à 1 min de
+        latence surprise pendant laquelle les appuis suivants sont ignorés.
+        """
+        try:
+            self._ensure_model()
+            log.info("Whisper prêt (device=%s)", self._active_device)
+        except Exception:
+            log.exception("Préchargement Whisper impossible — chargera à la 1re dictée")
 
     def _detect_restricted(self, audio: np.ndarray) -> Optional[str]:
         """Détection de langue restreinte au set autorisé (FR/EN/ES).

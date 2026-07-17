@@ -9,14 +9,16 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 
-from PyQt6.QtCore import QLockFile
+from PyQt6.QtCore import QLockFile, QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
 from orakle import config
 from orakle.controller import Controller
+from orakle.tray_icon_visibility import promote_tray_icon
 from orakle.version import VERSION
 from ui.app_icon import load_logo_icon
 from ui.overlay import RecordingOverlays
+from ui.toast import StatusToast
 from ui.tray import OrakleTray
 
 
@@ -75,20 +77,49 @@ def main() -> int:
     controller = Controller()
     tray = OrakleTray(controller)
     tray.show()
+    # Windows 11 : demander l'icône « toujours visible » près de l'horloge.
+    # Différé : Windows crée l'entrée registre après le 1er affichage du tray.
+    QTimer.singleShot(4000, promote_tray_icon)
 
     # Overlay d'enregistrement (capsule + onde de forme) sur TOUS les écrans, branché
     # sur l'état. Le niveau micro est mis à l'échelle pour l'affichage (RMS voix ~0,02-0,1).
     overlay = RecordingOverlays(
         level_provider=lambda: min(1.0, controller.recorder.level * 12.0)
     )
+    # Toast discret bas-droite : « Transcription… » puis « Texte inséré » +
+    # bouton Copier. C'est LE retour visuel qui manquait entre la fin de la
+    # capture et l'arrivée du texte (3 à 8 s de traitement).
+    toast = StatusToast()
+
+    def _toast_on() -> bool:
+        return bool(controller.settings.get("show_status_toast", True))
 
     def _on_state(state: str) -> None:
         if state == "recording":
             overlay.show_overlay()
-        else:
-            overlay.hide_overlay()
+            toast.hide()
+            return
+        overlay.hide_overlay()
+        if state == "processing" and _toast_on():
+            toast.show_processing()
+        elif state == "idle":
+            toast.on_idle()
 
     controller.state_changed.connect(_on_state)
+    controller.text_injected.connect(
+        lambda text: toast.show_result(text) if _toast_on() else None
+    )
+    controller.nothing_heard.connect(
+        lambda: toast.show_info("Aucun texte reconnu") if _toast_on() else None
+    )
+    controller.error.connect(
+        lambda msg: toast.show_error(msg) if _toast_on() else None
+    )
+    # Appui pendant une transcription en cours : re-signaler le toast au lieu
+    # d'ignorer en silence (« je le fais plusieurs fois sans comprendre »).
+    controller.busy_hint.connect(
+        lambda: toast.show_processing() if _toast_on() else None
+    )
     controller.start()
     logging.getLogger(__name__).info(
         "ORAKLE %s démarré — maintenir %s pour dicter",

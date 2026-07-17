@@ -11,6 +11,7 @@
   "compute_type": "int8",
   "append_trailing_space": true,
   "show_notifications": false,
+  "show_status_toast": true,
   "check_updates": true,
   "mute_media_while_recording": true,
   "mute_targets": [],

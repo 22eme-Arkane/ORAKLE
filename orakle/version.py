@@ -11,7 +11,7 @@ import logging
 import re
 from typing import Optional
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 
 GITHUB_REPO = "22eme-Arkane/ORAKLE"
 API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
